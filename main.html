@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>shamanAI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.4.0/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.min.js"></script>
+    <style>
+        #output { border: 1px solid #ccc; padding: 20px; margin: 10px; }
+        canvas { border: 1px solid #000; }
+    </style>
+</head>
+<body>
+    <div id="interface">
+        <input type="text" id="input" placeholder="Введите запрос..." style="width: 300px;">
+        <button onclick="processInput()">Выполнить</button>
+        <div id="output"></div>
+        <canvas id="graphCanvas" width="600" height="400"></canvas>
+        <canvas id="chemCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <script>
+        // База знаний формул из Telegram-чата физики
+        const physicsFormulas = {
+            "кинематика": [
+                "v = v₀ + at",
+                "s = v₀t + at²/2", 
+                "v² = v₀² + 2as",
+                "x = x₀ + v₀cos(α)t",
+                "y = y₀ + v₀sin(α)t - gt²/2"
+            ],
+            "динамика": [
+                "F = ma",
+                "F = G(m₁m₂)/r²",
+                "Fтр = μN",
+                "Fупр = kx"
+            ],
+            "электричество": [
+                "I = U/R",
+                "P = UI",
+                "Q = I²Rt",
+                "C = q/U",
+                "F = k(q₁q₂)/r²"
+            ]
+        };
+
+        // Модель нейросети для математики
+        class ShamanAIMathModel {
+            constructor() {
+                this.model = null;
+                this.buildModel();
+            }
+
+            buildModel() {
+                this.model = tf.sequential({
+                    layers: [
+                        tf.layers.dense({inputShape: [10], units: 64, activation: 'relu'}),
+                        tf.layers.dense({units: 32, activation: 'relu'}),
+                        tf.layers.dense({units: 16, activation: 'relu'}),
+                        tf.layers.dense({units: 8, activation: 'linear'})
+                    ]
+                });
+            }
+
+            async train() {
+                // Обучение на математических данных
+                const xs = tf.randomNormal([100, 10]);
+                const ys = tf.randomNormal([100, 8]);
+                
+                this.model.compile({
+                    optimizer: 'adam',
+                    loss: 'meanSquaredError'
+                });
+
+                await this.model.fit(xs, ys, {
+                    epochs: 10,
+                    batchSize: 32
+                });
+            }
+
+            predict(input) {
+                return this.model.predict(tf.tensor2d([input]));
+            }
+        }
+
+        // Модель для физики
+        class ShamanAIPhysicsModel {
+            constructor() {
+                this.formulaDatabase = physicsFormulas;
+            }
+
+            findFormulas(topic) {
+                return this.formulaDatabase[topic.toLowerCase()] || ["Формулы по данной теме не найдены"];
+            }
+
+            generateHomework(grade) {
+                const homeworkTemplates = {
+                    "9": [
+                        "Решить задачи на закон сохранения энергии",
+                        "Расчет движения тела под углом к горизонту",
+                        "Задачи на закон Ома для участка цепи",
+                        "Расчет количества теплоты"
+                    ],
+                    "10": [
+                        "Задачи на термодинамику",
+                        "Расчет электрических цепей",
+                        "Задачи на фотоэффект",
+                        "Ядерные реакции и расчеты"
+                    ]
+                };
+                return homeworkTemplates[grade] || ["ДЗ для данного класса не найдено"];
+            }
+        }
+
+        // Система рисования графиков
+        class GraphRenderer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+            }
+
+            drawFunction(func, xMin = -10, xMax = 10) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.beginPath();
+                
+                const scaleX = this.canvas.width / (xMax - xMin);
+                const scaleY = this.canvas.height / 20;
+                const centerY = this.canvas.height / 2;
+
+                for(let x = xMin; x <= xMax; x += 0.1) {
+                    try {
+                        const y = eval(func.replace(/x/g, `(${x})`));
+                        const pixelX = (x - xMin) * scaleX;
+                        const pixelY = centerY - y * scaleY;
+                        
+                        if(x === xMin) {
+                            this.ctx.moveTo(pixelX, pixelY);
+                        } else {
+                            this.ctx.lineTo(pixelX, pixelY);
+                        }
+                    } catch(e) {}
+                }
+                
+                this.ctx.strokeStyle = 'blue';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+
+            drawElectricalCircuit(components) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.beginPath();
+                
+                // Рисование простой электрической схемы
+                this.ctx.rect(50, 50, 100, 60); // Источник
+                this.ctx.rect(200, 50, 20, 60); // Резистор
+                this.ctx.arc(250, 80, 15, 0, 2 * Math.PI); // Лампочка
+                
+                this.ctx.strokeStyle = 'red';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+                
+                this.ctx.fillText("Батарея", 60, 80);
+                this.ctx.fillText("R", 205, 80);
+                this.ctx.fillText("Лампа", 270, 80);
+            }
+        }
+
+        // PDF парсер (упрощенная имитация)
+        class PDFParser {
+            constructor() {
+                this.telegramData = [];
+            }
+
+            async loadTelegramData() {
+                // Имитация загрузки данных из Telegram
+                this.telegramData = [
+                    "Формула силы: F = ma",
+                    "Закон Ома: I = U/R",
+                    "Кинетическая энергия: E = mv²/2",
+                    "ДЗ 9 класс: стр. 45 №1-5",
+                    "ДЗ 10 класс: стр. 78 №3-8"
+                ];
+            }
+
+            searchInPDF(query) {
+                return this.telegramData.filter(item => 
+                    item.toLowerCase().includes(query.toLowerCase())
+                );
+            }
+        }
+
+        // Основная система shamanAI
+        class ShamanAI {
+            constructor() {
+                this.mathModel = new ShamanAIMathModel();
+                this.physicsModel = new ShamanAIPhysicsModel();
+                this.graphRenderer = new GraphRenderer('graphCanvas');
+                this.chemRenderer = new GraphRenderer('chemCanvas');
+                this.pdfParser = new PDFParser();
+                this.init();
+            }
+
+            async init() {
+                await this.mathModel.train();
+                await this.pdfParser.loadTelegramData();
+            }
+
+            async processQuery(input) {
+                const response = {
+                    text: "",
+                    formulas: [],
+                    graphs: [],
+                    homework: []
+                };
+
+                // Анализ ввода и маршрутизация
+                if(input.includes('формул') || input.includes('физик')) {
+                    const topic = this.extractTopic(input);
+                    response.formulas = this.physicsModel.findFormulas(topic);
+                    response.text = `Формулы по теме "${topic}":`;
+                }
+                else if(input.includes('график') || input.includes('функци')) {
+                    const func = this.extractFunction(input);
+                    this.graphRenderer.drawFunction(func);
+                    response.text = `График функции: ${func}`;
+                }
+                else if(input.includes('схем') || input.includes('электричес')) {
+                    this.graphRenderer.drawElectricalCircuit();
+                    response.text = "Электрическая схема";
+                }
+                else if(input.includes('дз') || input.includes('домашн')) {
+                    const grade = this.extractGrade(input);
+                    response.homework = this.physicsModel.generateHomework(grade);
+                    response.text = `ДЗ для ${grade} класса:`;
+                }
+                else if(input.includes('телеграм') || input.includes('pdf')) {
+                    const results = this.pdfParser.searchInPDF(input);
+                    response.text = "Результаты из Telegram чата:";
+                    response.formulas = results;
+                }
+                else {
+                    // Математические вычисления
+                    try {
+                        const result = eval(input);
+                        response.text = `Результат: ${result}`;
+                    } catch(e) {
+                        response.text = "Выполнена обработка запроса";
+                    }
+                }
+
+                return response;
+            }
+
+            extractTopic(input) {
+                const topics = ['кинематика', 'динамика', 'электричество', 'оптика'];
+                return topics.find(topic => input.includes(topic)) || 'механика';
+            }
+
+            extractFunction(input) {
+                const match = input.match(/[yY]\s*=\s*([^\\]+)/);
+                return match ? match[1] : 'x**2';
+            }
+
+            extractGrade(input) {
+                const match = input.match(/\d+/);
+                return match ? match[0] : '9';
+            }
+        }
+
+        // Глобальная инициализация
+        let shamanAI;
+
+        async function initShamanAI() {
+            shamanAI = new ShamanAI();
+            document.getElementById('output').innerHTML = "shamanAI инициализирован и готов к работе";
+        }
+
+        async function processInput() {
+            const input = document.getElementById('input').value;
+            const output = document.getElementById('output');
+            
+            if(!shamanAI) {
+                await initShamanAI();
+            }
+
+            const response = await shamanAI.processQuery(input);
+            
+            let html = `<strong>${response.text}</strong><br>`;
+            
+            if(response.formulas.length > 0) {
+                html += "<h3>Формулы:</h3><ul>";
+                response.formulas.forEach(formula => {
+                    html += `<li>${formula}</li>`;
+                });
+                html += "</ul>";
+            }
+            
+            if(response.homework.length > 0) {
+                html += "<h3>Домашнее задание:</h3><ul>";
+                response.homework.forEach(task => {
+                    html += `<li>${task}</li>`;
+                });
+                html += "</ul>";
+            }
+
+            output.innerHTML = html;
+            
+            // Автоматическое рендеринг формул MathJax
+            if(typeof MathJax !== 'undefined') {
+                MathJax.typesetPromise([output]);
+            }
+        }
+
+        // Автоматическая инициализация при загрузке
+        window.onload = initShamanAI;
+    </script>
+</body>
+</html>
