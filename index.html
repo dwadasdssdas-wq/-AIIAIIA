@@ -1,319 +1,2549 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>shamanAI</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.4.0/dist/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>shamanAI - Продвинутый ИИ Агент</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.4.0/dist/axios.min.js"></script>
     <style>
-        #output { border: 1px solid #ccc; padding: 20px; margin: 10px; }
-        canvas { border: 1px solid #000; }
+        :root {
+            --primary: #8A2BE2;
+            --secondary: #00CED1;
+            --accent: #FF1493;
+            --dark: #1A1A2E;
+            --light: #F0F8FF;
+            --neon-glow: 0 0 10px var(--secondary), 0 0 20px var(--secondary), 0 0 30px var(--accent);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--dark) 0%, #16213E 50%, #0F3460 100%);
+            color: var(--light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 30px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: var(--neon-glow); }
+            to { text-shadow: 0 0 15px var(--accent), 0 0 25px var(--accent), 0 0 35px var(--primary); }
+        }
+
+        .shaman-title {
+            font-size: 4rem;
+            background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chat-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            border: 2px solid var(--primary);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--neon-glow);
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 15px;
+            border-radius: 15px;
+            position: relative;
+            animation: messageSlide 0.3s ease-out;
+        }
+
+        @keyframes messageSlide {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--primary), #9370DB);
+            border-bottom-right-radius: 5px;
+        }
+
+        .ai-message {
+            align-self: flex-start;
+            background: linear-gradient(135deg, var(--secondary), #20B2AA);
+            border-bottom-left-radius: 5px;
+        }
+
+        .input-area {
+            display: flex;
+            padding: 20px;
+            gap: 10px;
+            border-top: 2px solid var(--primary);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid var(--secondary);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--light);
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+            box-shadow: 0 0 15px var(--secondary);
+        }
+
+        .tools-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            border: 2px solid var(--secondary);
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tool-section {
+            margin-bottom: 25px;
+        }
+
+        .tool-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--secondary);
+            border-bottom: 1px solid var(--secondary);
+            padding-bottom: 5px;
+        }
+
+        .upload-area {
+            border: 3px dashed var(--accent);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        .upload-area:hover {
+            background: rgba(255, 20, 147, 0.1);
+            box-shadow: 0 0 20px var(--accent);
+        }
+
+        .preview-canvas {
+            width: 100%;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .button {
+            background: linear-gradient(45deg, var(--primary), var(--accent));
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--neon-glow);
+        }
+
+        .math-output {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid var(--secondary);
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 10px;
+            color: var(--secondary);
+            font-style: italic;
+        }
+
+        .typing-dots {
+            display: inline-block;
+        }
+
+        .typing-dots::after {
+            content: '...';
+            animation: typing 1.5s infinite;
+        }
+
+        @keyframes typing {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
     </style>
 </head>
 <body>
-    <div id="interface">
-        <input type="text" id="input" placeholder="Введите запрос..." style="width: 300px;">
-        <button onclick="processInput()">Выполнить</button>
-        <div id="output"></div>
-        <canvas id="graphCanvas" width="600" height="400"></canvas>
-        <canvas id="chemCanvas" width="600" height="400"></canvas>
+    <div class="container">
+        <div class="header">
+            <h1 class="shaman-title">shamanAI</h1>
+            <p class="tagline">Продвинутый ИИ агент для математики, физики и анализа изображений</p>
+        </div>
+
+        <div class="main-grid">
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message ai-message">
+                        Привет! Я shamanAI - ваш продвинутый ИИ помощник. Могу решать сложные задачи по математике и физике, анализировать изображения, читать рукописный текст и строить графики. Чем могу помочь?
+                    </div>
+                </div>
+                <div class="typing-indicator" id="typingIndicator">
+                    shamanAI печатает<span class="typing-dots"></span>
+                </div>
+                <div class="input-area">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Задайте вопрос или загрузите изображение...">
+                    <button class="button" onclick="sendMessage()">Отправить</button>
+                </div>
+            </div>
+
+            <div class="tools-panel">
+                <div class="tool-section">
+                    <h3 class="tool-title">📷 Загрузка изображений</h3>
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                        <p>Перетащите или кликните для загрузки</p>
+                        <p style="font-size: 0.9em; opacity: 0.7;">Поддерживает: скриншоты, фото задач, графики, схемы</p>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                    <canvas id="previewCanvas" class="preview-canvas"></canvas>
+                    <button class="button" onclick="analyzeImage()" style="width: 100%;">Анализировать изображение</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3 class="tool-title">📊 Быстрый доступ</h3>
+                    <button class="button" onclick="quickAction('graph')" style="width: 100%; margin-bottom: 10px;">Построить график</button>
+                    <button class="button" onclick="quickAction('physics')" style="width: 100%; margin-bottom: 10px;">Формулы физики</button>
+                    <button class="button" onclick="quickAction('homework')" style="width: 100%; margin-bottom: 10px;">Сгенерировать ДЗ</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3 class="tool-title">🧮 Результаты</h3>
+                    <div id="mathOutput" class="math-output">
+                        Здесь появятся решения и формулы...
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // База знаний формул из Telegram-чата физики
-        const physicsFormulas = {
-            "кинематика": [
-                "v = v₀ + at",
-                "s = v₀t + at²/2", 
-                "v² = v₀² + 2as",
-                "x = x₀ + v₀cos(α)t",
-                "y = y₀ + v₀sin(α)t - gt²/2"
-            ],
-            "динамика": [
-                "F = ma",
-                "F = G(m₁m₂)/r²",
-                "Fтр = μN",
-                "Fупр = kx"
-            ],
-            "электричество": [
-                "I = U/R",
-                "P = UI",
-                "Q = I²Rt",
-                "C = q/U",
-                "F = k(q₁q₂)/r²"
-            ]
-        };
-
-        // Модель нейросети для математики
-        class ShamanAIMathModel {
-            constructor() {
-                this.model = null;
-                this.buildModel();
-            }
-
-            buildModel() {
-                this.model = tf.sequential({
-                    layers: [
-                        tf.layers.dense({inputShape: [10], units: 64, activation: 'relu'}),
-                        tf.layers.dense({units: 32, activation: 'relu'}),
-                        tf.layers.dense({units: 16, activation: 'relu'}),
-                        tf.layers.dense({units: 8, activation: 'linear'})
-                    ]
-                });
-            }
-
-            async train() {
-                // Обучение на математических данных
-                const xs = tf.randomNormal([100, 10]);
-                const ys = tf.randomNormal([100, 8]);
-                
-                this.model.compile({
-                    optimizer: 'adam',
-                    loss: 'meanSquaredError'
-                });
-
-                await this.model.fit(xs, ys, {
-                    epochs: 10,
-                    batchSize: 32
-                });
-            }
-
-            predict(input) {
-                return this.model.predict(tf.tensor2d([input]));
-            }
-        }
-
-        // Модель для физики
-        class ShamanAIPhysicsModel {
-            constructor() {
-                this.formulaDatabase = physicsFormulas;
-            }
-
-            findFormulas(topic) {
-                return this.formulaDatabase[topic.toLowerCase()] || ["Формулы по данной теме не найдены"];
-            }
-
-            generateHomework(grade) {
-                const homeworkTemplates = {
-                    "9": [
-                        "Решить задачи на закон сохранения энергии",
-                        "Расчет движения тела под углом к горизонту",
-                        "Задачи на закон Ома для участка цепи",
-                        "Расчет количества теплоты"
-                    ],
-                    "10": [
-                        "Задачи на термодинамику",
-                        "Расчет электрических цепей",
-                        "Задачи на фотоэффект",
-                        "Ядерные реакции и расчеты"
-                    ]
-                };
-                return homeworkTemplates[grade] || ["ДЗ для данного класса не найдено"];
-            }
-        }
-
-        // Система рисования графиков
-        class GraphRenderer {
-            constructor(canvasId) {
-                this.canvas = document.getElementById(canvasId);
-                this.ctx = this.canvas.getContext('2d');
-            }
-
-            drawFunction(func, xMin = -10, xMax = 10) {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.beginPath();
-                
-                const scaleX = this.canvas.width / (xMax - xMin);
-                const scaleY = this.canvas.height / 20;
-                const centerY = this.canvas.height / 2;
-
-                for(let x = xMin; x <= xMax; x += 0.1) {
-                    try {
-                        const y = eval(func.replace(/x/g, `(${x})`));
-                        const pixelX = (x - xMin) * scaleX;
-                        const pixelY = centerY - y * scaleY;
-                        
-                        if(x === xMin) {
-                            this.ctx.moveTo(pixelX, pixelY);
-                        } else {
-                            this.ctx.lineTo(pixelX, pixelY);
-                        }
-                    } catch(e) {}
-                }
-                
-                this.ctx.strokeStyle = 'blue';
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-            }
-
-            drawElectricalCircuit(components) {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.beginPath();
-                
-                // Рисование простой электрической схемы
-                this.ctx.rect(50, 50, 100, 60); // Источник
-                this.ctx.rect(200, 50, 20, 60); // Резистор
-                this.ctx.arc(250, 80, 15, 0, 2 * Math.PI); // Лампочка
-                
-                this.ctx.strokeStyle = 'red';
-                this.ctx.lineWidth = 3;
-                this.ctx.stroke();
-                
-                this.ctx.fillText("Батарея", 60, 80);
-                this.ctx.fillText("R", 205, 80);
-                this.ctx.fillText("Лампа", 270, 80);
-            }
-        }
-
-        // PDF парсер (упрощенная имитация)
-        class PDFParser {
-            constructor() {
-                this.telegramData = [];
-            }
-
-            async loadTelegramData() {
-                // Имитация загрузки данных из Telegram
-                this.telegramData = [
-                    "Формула силы: F = ma",
-                    "Закон Ома: I = U/R",
-                    "Кинетическая энергия: E = mv²/2",
-                    "ДЗ 9 класс: стр. 45 №1-5",
-                    "ДЗ 10 класс: стр. 78 №3-8"
-                ];
-            }
-
-            searchInPDF(query) {
-                return this.telegramData.filter(item => 
-                    item.toLowerCase().includes(query.toLowerCase())
-                );
-            }
-        }
-
-        // Основная система shamanAI
+        // Основной класс shamanAI
         class ShamanAI {
             constructor() {
-                this.mathModel = new ShamanAIMathModel();
-                this.physicsModel = new ShamanAIPhysicsModel();
-                this.graphRenderer = new GraphRenderer('graphCanvas');
-                this.chemRenderer = new GraphRenderer('chemCanvas');
-                this.pdfParser = new PDFParser();
+                this.isInitialized = false;
+                this.ocrWorker = null;
+                this.mlModels = {};
+                this.chatHistory = [];
                 this.init();
             }
 
             async init() {
-                await this.mathModel.train();
-                await this.pdfParser.loadTelegramData();
+                await this.loadMLModels();
+                await this.initOCR();
+                this.isInitialized = true;
+                this.addMessage("shamanAI инициализирован и готов к работе!", "ai");
             }
 
-            async processQuery(input) {
-                const response = {
-                    text: "",
-                    formulas: [],
-                    graphs: [],
-                    homework: []
-                };
+            async loadMLModels() {
+                try {
+                    // Загрузка моделей компьютерного зрения
+                    this.mlModels.objectDetection = await cocoSsd.load();
+                    this.mlModels.imageClassification = await mobilenet.load();
+                    console.log("ML модели загружены");
+                } catch (error) {
+                    console.error("Ошибка загрузки ML моделей:", error);
+                }
+            }
 
-                // Анализ ввода и маршрутизация
-                if(input.includes('формул') || input.includes('физик')) {
-                    const topic = this.extractTopic(input);
-                    response.formulas = this.physicsModel.findFormulas(topic);
-                    response.text = `Формулы по теме "${topic}":`;
-                }
-                else if(input.includes('график') || input.includes('функци')) {
-                    const func = this.extractFunction(input);
-                    this.graphRenderer.drawFunction(func);
-                    response.text = `График функции: ${func}`;
-                }
-                else if(input.includes('схем') || input.includes('электричес')) {
-                    this.graphRenderer.drawElectricalCircuit();
-                    response.text = "Электрическая схема";
-                }
-                else if(input.includes('дз') || input.includes('домашн')) {
-                    const grade = this.extractGrade(input);
-                    response.homework = this.physicsModel.generateHomework(grade);
-                    response.text = `ДЗ для ${grade} класса:`;
-                }
-                else if(input.includes('телеграм') || input.includes('pdf')) {
-                    const results = this.pdfParser.searchInPDF(input);
-                    response.text = "Результаты из Telegram чата:";
-                    response.formulas = results;
-                }
-                else {
-                    // Математические вычисления
-                    try {
-                        const result = eval(input);
-                        response.text = `Результат: ${result}`;
-                    } catch(e) {
-                        response.text = "Выполнена обработка запроса";
-                    }
-                }
+            async initOCR() {
+                this.ocrWorker = await Tesseract.createWorker('rus+eng', 1, {
+                    logger: m => console.log(m)
+                });
+                await this.ocrWorker.setParameters({
+                    tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+                    tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,!?+-=(){}[]'
+                });
+            }
 
+            async processMessage(message, imageData = null) {
+                this.showTypingIndicator();
+                
+                // Имитация обработки
+                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+                
+                let response = "";
+                
+                if (imageData) {
+                    response = await this.analyzeImageContent(imageData);
+                } else {
+                    response = await this.generateTextResponse(message);
+                }
+                
+                this.hideTypingIndicator();
                 return response;
             }
 
-            extractTopic(input) {
-                const topics = ['кинематика', 'динамика', 'электричество', 'оптика'];
-                return topics.find(topic => input.includes(topic)) || 'механика';
+            async analyzeImageContent(imageData) {
+                let analysis = "Анализ изображения:\n\n";
+                
+                try {
+                    // OCR для текста
+                    const { data: { text } } = await this.ocrWorker.recognize(imageData);
+                    if (text.trim()) {
+                        analysis += `📝 Распознанный текст:\n${text}\n\n`;
+                    }
+
+                    // Обнаружение объектов
+                    const objects = await this.mlModels.objectDetection.detect(imageData);
+                    if (objects.length > 0) {
+                        analysis += "🔍 Обнаруженные объекты:\n";
+                        objects.forEach(obj => {
+                            analysis += `- ${obj.class} (${Math.round(obj.score * 100)}%)\n`;
+                        });
+                        analysis += "\n";
+                    }
+
+                    // Классификация изображения
+                    const predictions = await this.mlModels.imageClassification.classify(imageData);
+                    if (predictions.length > 0) {
+                        analysis += "🏷️ Классификация:\n";
+                        predictions.slice(0, 3).forEach(pred => {
+                            analysis += `- ${pred.className} (${Math.round(pred.probability * 100)}%)\n`;
+                        });
+                    }
+
+                    if (!text.trim() && objects.length === 0) {
+                        analysis += "На изображении не обнаружено четкого текста или узнаваемых объектов. Попробуйте загрузить более качественное изображение.";
+                    }
+
+                } catch (error) {
+                    analysis = "Ошибка при анализе изображения. Убедитесь, что файл корректен.";
+                }
+                
+                return analysis;
             }
 
-            extractFunction(input) {
-                const match = input.match(/[yY]\s*=\s*([^\\]+)/);
-                return match ? match[1] : 'x**2';
+            async generateTextResponse(message) {
+                // Анализ содержания сообщения
+                const lowerMessage = message.toLowerCase();
+                
+                if (lowerMessage.includes('привет') || lowerMessage.includes('hello')) {
+                    return "Привет! Я shamanAI. Могу помочь с математикой, физикой, анализом изображений и другими научными задачами.";
+                }
+                
+                if (lowerMessage.includes('физик') || lowerMessage.includes('формул')) {
+                    return this.getPhysicsFormulas(this.extractTopic(message));
+                }
+                
+                if (lowerMessage.includes('математ') || lowerMessage.includes('реши') || lowerMessage.includes('вычисл')) {
+                    return this.solveMathProblem(message);
+                }
+                
+                if (lowerMessage.includes('график') || lowerMessage.includes('plot')) {
+                    return this.handleGraphRequest(message);
+                }
+                
+                if (lowerMessage.includes('дз') || lowerMessage.includes('домашн')) {
+                    return this.generateHomework(this.extractGrade(message));
+                }
+                
+                // Умный ответ по умолчанию
+                return this.generateSmartResponse(message);
             }
 
-            extractGrade(input) {
-                const match = input.match(/\d+/);
+            getPhysicsFormulas(topic) {
+                const formulas = {
+                    'механика': [
+                        'Второй закон Ньютона: F = ma',
+                        'Кинетическая энергия: Eₖ = mv²/2',
+                        'Потенциальная энергия: Eₚ = mgh',
+                        'Импульс: p = mv',
+                        'Закон сохранения энергии: E₁ = E₂'
+                    ],
+                    'электричество': [
+                        'Закон Ома: I = U/R',
+                        'Мощность: P = UI = I²R = U²/R',
+                        'Закон Кулона: F = k(q₁q₂)/r²',
+                        'Напряженность: E = F/q',
+                        'Электроемкость: C = q/U'
+                    ],
+                    'оптика': [
+                        'Закон преломления: n₁sinθ₁ = n₂sinθ₂',
+                        'Формула линзы: 1/F = 1/d + 1/f',
+                        'Оптическая сила: D = 1/F',
+                        'Скорость света: v = c/n'
+                    ]
+                };
+                
+                const selectedTopic = formulas[topic] ? topic : 'механика';
+                return `📚 Формулы по теме "${selectedTopic}":\n${formulas[selectedTopic].join('\n')}`;
+            }
+
+            solveMathProblem(problem) {
+                try {
+                    // Простые математические вычисления
+                    const cleanProblem = problem.replace(/[^0-9+\-*/().,]/g, '');
+                    if (cleanProblem) {
+                        const result = eval(cleanProblem);
+                        return `🧮 Решение: ${cleanProblem} = ${result}`;
+                    }
+                    
+                    // Более сложные случаи
+                    if (problem.includes('уравнение') || problem.includes('уравнения')) {
+                        return "Для решения уравнений использую численные методы. Покажу решение графически.";
+                    }
+                    
+                    return "Могу помочь с вычислениями, решением уравнений, построением графиков. Уточните задачу.";
+                    
+                } catch (error) {
+                    return "Не удалось решить задачу. Попробуйте сформулировать иначе или загрузите изображение с задачей.";
+                }
+            }
+
+            handleGraphRequest(message) {
+                return "Готов построить график! Укажите функцию, например: 'y = x^2' или 'sin(x)'";
+            }
+
+            generateHomework(grade) {
+                const homework = {
+                    '9': [
+                        '1. Решить задачи на законы Ньютона',
+                        '2. Расчет движения тела под углом к горизонту', 
+                        '3. Задачи на закон сохранения энергии',
+                        '4. Электрические цепи: расчет сопротивления'
+                    ],
+                    '10': [
+                        '1. Молекулярная физика: уравнение Менделеева-Клапейрона',
+                        '2. Термодинамика: расчет КПД тепловых машин',
+                        '3. Электромагнетизм: закон электромагнитной индукции',
+                        '4. Оптика: построение изображений в линзах'
+                    ]
+                };
+                
+                const selectedGrade = homework[grade] ? grade : '9';
+                return `📝 Домашнее задание для ${selectedGrade} класса:\n${homework[selectedGrade].join('\n')}`;
+            }
+
+            generateSmartResponse(message) {
+                const responses = [
+                    "Интересный вопрос! Давайте разберем его подробнее.",
+                    "Могу предложить несколько подходов к решению этой задачи.",
+                    "Для более точного ответа загрузите, пожалуйста, изображение с условием задачи.",
+                    "Эта задача требует дополнительного анализа. Давайте рассмотрим ее с разных сторон.",
+                    "Могу помочь с расчетами, построением графиков или объяснением физических законов."
+                ];
+                
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+
+            extractTopic(message) {
+                const topics = ['механика', 'электричество', 'оптика', 'термодинамика'];
+                return topics.find(topic => message.toLowerCase().includes(topic)) || 'механика';
+            }
+
+            extractGrade(message) {
+                const match = message.match(/\d+/);
                 return match ? match[0] : '9';
             }
+
+            addMessage(content, sender) {
+                this.chatHistory.push({ content, sender, timestamp: new Date() });
+            }
+
+            showTypingIndicator() {
+                document.getElementById('typingIndicator').style.display = 'block';
+            }
+
+            hideTypingIndicator() {
+                document.getElementById('typingIndicator').style.display = 'none';
+            }
         }
 
-        // Глобальная инициализация
+        // Глобальные переменные
         let shamanAI;
+        let currentImage = null;
 
-        async function initShamanAI() {
+        // Инициализация при загрузке
+        window.onload = async function() {
             shamanAI = new ShamanAI();
-            document.getElementById('output').innerHTML = "shamanAI инициализирован и готов к работе";
-        }
+            
+            // Обработка Enter в поле ввода
+            document.getElementById('chatInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        };
 
-        async function processInput() {
-            const input = document.getElementById('input').value;
-            const output = document.getElementById('output');
+        // Функции интерфейса
+        function addMessageToChat(message, sender) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = message;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
             
-            if(!shamanAI) {
-                await initShamanAI();
-            }
-
-            const response = await shamanAI.processQuery(input);
-            
-            let html = `<strong>${response.text}</strong><br>`;
-            
-            if(response.formulas.length > 0) {
-                html += "<h3>Формулы:</h3><ul>";
-                response.formulas.forEach(formula => {
-                    html += `<li>${formula}</li>`;
-                });
-                html += "</ul>";
-            }
-            
-            if(response.homework.length > 0) {
-                html += "<h3>Домашнее задание:</h3><ul>";
-                response.homework.forEach(task => {
-                    html += `<li>${task}</li>`;
-                });
-                html += "</ul>";
-            }
-
-            output.innerHTML = html;
-            
-            // Автоматическое рендеринг формул MathJax
-            if(typeof MathJax !== 'undefined') {
-                MathJax.typesetPromise([output]);
+            if (sender === 'ai') {
+                shamanAI.addMessage(message, 'ai');
+            } else {
+                shamanAI.addMessage(message, 'user');
             }
         }
 
-        // Автоматическая инициализация при загрузке
-        window.onload = initShamanAI;
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message && !currentImage) return;
+            
+            if (message) {
+                addMessageToChat(message, 'user');
+                input.value = '';
+                
+                const response = await shamanAI.processMessage(message, currentImage);
+                addMessageToChat(response, 'ai');
+                
+                // Обновляем математический вывод
+                document.getElementById('mathOutput').textContent = response;
+                
+                currentImage = null;
+                document.getElementById('previewCanvas').style.display = 'none';
+            }
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.getElementById('previewCanvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Масштабирование изображения
+                    const maxWidth = 400;
+                    const scale = maxWidth / img.width;
+                    canvas.width = maxWidth;
+                    canvas.height = img.height * scale;
+                    
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    canvas.style.display = 'block';
+                    
+                    currentImage = canvas;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function analyzeImage() {
+            if (!currentImage) {
+                addMessageToChat("Пожалуйста, сначала загрузите изображение", 'ai');
+                return;
+            }
+            
+            addMessageToChat("🖼️ Анализирую загруженное изображение...", 'user');
+            
+            const response = await shamanAI.processMessage("Анализ изображения", currentImage);
+            addMessageToChat(response, 'ai');
+            
+            document.getElementById('mathOutput').textContent = response;
+        }
+
+        function quickAction(action) {
+            const actions = {
+                'graph': "Построение графиков: укажите функцию для построения, например 'y = sin(x)' или 'x^2 + 2x + 1'",
+                'physics': shamanAI.getPhysicsFormulas('механика'),
+                'homework': shamanAI.generateHomework('9')
+            };
+            
+            addMessageToChat(actions[action], 'ai');
+            document.getElementById('mathOutput').textContent = actions[action];
+        }
     </script>
 </body>
 </html>
+<!-- Добавьте этот код в существующий HTML после основного скрипта -->
+
+<script>
+// Расширенный математический решатель shamanAI
+class MathSolver {
+    constructor() {
+        this.complexity = 'advanced';
+    }
+
+    solveEquation(equation) {
+        try {
+            // Упрощение уравнения
+            equation = equation.replace(/[^0-9xX+\-*/().,=]/g, '');
+            
+            if (equation.includes('=')) {
+                const sides = equation.split('=');
+                return this.solveAlgebraic(sides[0], sides[1]);
+            } else {
+                return this.evaluateExpression(equation);
+            }
+        } catch (error) {
+            return `Ошибка решения уравнения: ${error.message}`;
+        }
+    }
+
+    solveAlgebraic(left, right) {
+        // Простой решатель алгебраических уравнений
+        const solutions = [];
+        
+        // Попробуем найти x в диапазоне -100 до 100
+        for (let x = -100; x <= 100; x++) {
+            try {
+                const leftVal = eval(left.replace(/x/gi, x));
+                const rightVal = eval(right.replace(/x/gi, x));
+                
+                if (Math.abs(leftVal - rightVal) < 0.001) {
+                    solutions.push(x);
+                    if (solutions.length > 3) break;
+                }
+            } catch (e) {}
+        }
+        
+        return solutions.length > 0 ? 
+            `Решения уравнения: x = ${solutions.join(', ')}` :
+            'Решение не найдено в диапазоне -100 до 100';
+    }
+
+    evaluateExpression(expr) {
+        try {
+            const result = eval(expr);
+            return `Результат: ${expr} = ${result}`;
+        } catch (error) {
+            return `Ошибка вычисления: ${expr}`;
+        }
+    }
+
+    derivative(func, point) {
+        const h = 0.0001;
+        try {
+            const f1 = eval(func.replace(/x/g, `(${point + h})`));
+            const f2 = eval(func.replace(/x/g, `(${point})`));
+            const deriv = (f1 - f2) / h;
+            return `Производная f'(${point}) = ${deriv.toFixed(4)}`;
+        } catch (error) {
+            return "Ошибка вычисления производной";
+        }
+    }
+}
+
+// Система построения графиков
+class AdvancedGraphRenderer {
+    constructor() {
+        this.canvases = new Map();
+    }
+
+    createGraphCanvas(id, width = 600, height = 400) {
+        const canvas = document.createElement('canvas');
+        canvas.id = `graph-${id}`;
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.border = '2px solid var(--secondary)';
+        canvas.style.borderRadius = '10px';
+        canvas.style.margin = '10px 0';
+        return canvas;
+    }
+
+    plotFunction(func, xMin = -10, xMax = 10) {
+        const canvas = this.createGraphCanvas('function');
+        const ctx = canvas.getContext('2d');
+        
+        // Настройки графика
+        const padding = 40;
+        const graphWidth = canvas.width - 2 * padding;
+        const graphHeight = canvas.height - 2 * padding;
+        
+        // Очистка и фон
+        ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Оси координат
+        ctx.strokeStyle = 'var(--secondary)';
+        ctx.lineWidth = 2;
+        
+        // Ось Y
+        ctx.beginPath();
+        ctx.moveTo(padding, 0);
+        ctx.lineTo(padding, canvas.height);
+        ctx.stroke();
+        
+        // Ось X
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height - padding);
+        ctx.lineTo(canvas.width, canvas.height - padding);
+        ctx.stroke();
+        
+        // Построение графика
+        ctx.strokeStyle = 'var(--accent)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        
+        let firstPoint = true;
+        
+        for (let x = xMin; x <= xMax; x += 0.1) {
+            try {
+                const y = eval(func.replace(/x/g, `(${x})`));
+                const pixelX = padding + (x - xMin) * (graphWidth / (xMax - xMin));
+                const pixelY = canvas.height - padding - (y - this.getYMin(func, xMin, xMax)) * 
+                              (graphHeight / (this.getYRange(func, xMin, xMax)));
+                
+                if (firstPoint) {
+                    ctx.moveTo(pixelX, pixelY);
+                    firstPoint = false;
+                } else {
+                    ctx.lineTo(pixelX, pixelY);
+                }
+            } catch (e) {
+                firstPoint = true;
+            }
+        }
+        
+        ctx.stroke();
+        return canvas;
+    }
+
+    getYMin(func, xMin, xMax) {
+        let min = Infinity;
+        for (let x = xMin; x <= xMax; x += 0.5) {
+            try {
+                const y = eval(func.replace(/x/g, `(${x})`));
+                if (y < min) min = y;
+            } catch (e) {}
+        }
+        return min === Infinity ? -10 : min;
+    }
+
+    getYRange(func, xMin, xMax) {
+        let min = Infinity;
+        let max = -Infinity;
+        
+        for (let x = xMin; x <= xMax; x += 0.5) {
+            try {
+                const y = eval(func.replace(/x/g, `(${x})`));
+                if (y < min) min = y;
+                if (y > max) max = y;
+            } catch (e) {}
+        }
+        
+        return max - min || 20;
+    }
+
+    plotPhysicsDiagram(type, parameters) {
+        const canvas = this.createGraphCanvas('physics');
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        switch(type) {
+            case 'electrical':
+                this.drawElectricalCircuit(ctx, parameters);
+                break;
+            case 'mechanics':
+                this.drawMechanicalSystem(ctx, parameters);
+                break;
+            case 'optics':
+                this.drawOpticalSystem(ctx, parameters);
+                break;
+        }
+        
+        return canvas;
+    }
+
+    drawElectricalCircuit(ctx, params) {
+        ctx.strokeStyle = 'var(--secondary)';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = 'var(--light)';
+        
+        // Батарея
+        ctx.fillRect(50, 150, 40, 100);
+        ctx.fillText('Батарея', 35, 140);
+        
+        // Резистор
+        ctx.fillRect(150, 150, 60, 20);
+        ctx.fillText('R1', 165, 140);
+        
+        // Конденсатор
+        ctx.fillRect(250, 130, 10, 60);
+        ctx.fillRect(270, 130, 10, 60);
+        ctx.fillText('C1', 255, 120);
+        
+        // Соединения
+        ctx.beginPath();
+        ctx.moveTo(90, 150); ctx.lineTo(150, 150);
+        ctx.moveTo(210, 160); ctx.lineTo(250, 160);
+        ctx.moveTo(280, 160); ctx.lineTo(350, 160);
+        ctx.moveTo(50, 250); ctx.lineTo(350, 250);
+        ctx.stroke();
+    }
+}
+
+// Расширенная система физических расчетов
+class PhysicsEngine {
+    constructor() {
+        this.constants = {
+            g: 9.81,
+            c: 3e8,
+            k: 8.99e9,
+            h: 6.63e-34
+        };
+    }
+
+    solveKinematics(problem) {
+        const solutions = [];
+        
+        if (problem.includes('свободное падение')) {
+            const height = this.extractNumber(problem, 'высота');
+            if (height) {
+                const time = Math.sqrt(2 * height / this.constants.g);
+                const velocity = this.constants.g * time;
+                solutions.push(`Время падения: t = ${time.toFixed(2)} с`);
+                solutions.push(`Скорость в момент падения: v = ${velocity.toFixed(2)} м/с`);
+            }
+        }
+        
+        if (problem.includes('движение под углом')) {
+            const angle = this.extractNumber(problem, 'угол');
+            const velocity = this.extractNumber(problem, 'скорость');
+            if (angle && velocity) {
+                const rad = angle * Math.PI / 180;
+                const range = (velocity * velocity * Math.sin(2 * rad)) / this.constants.g;
+                const maxHeight = (velocity * velocity * Math.sin(rad) * Math.sin(rad)) / (2 * this.constants.g);
+                solutions.push(`Дальность полета: ${range.toFixed(2)} м`);
+                solutions.push(`Максимальная высота: ${maxHeight.toFixed(2)} м`);
+            }
+        }
+        
+        return solutions.length > 0 ? solutions.join('\n') : 'Не удалось решить задачу по кинематике';
+    }
+
+    solveDynamics(problem) {
+        if (problem.includes('F = ma')) {
+            const mass = this.extractNumber(problem, 'масса');
+            const acceleration = this.extractNumber(problem, 'ускорение');
+            if (mass && acceleration) {
+                const force = mass * acceleration;
+                return `Сила: F = ${force.toFixed(2)} Н`;
+            }
+        }
+        
+        return 'Не удалось решить задачу по динамике';
+    }
+
+    extractNumber(text, keyword) {
+        const regex = new RegExp(`${keyword}[^0-9]*([0-9]+\\.?[0-9]*)`, 'i');
+        const match = text.match(regex);
+        return match ? parseFloat(match[1]) : null;
+    }
+}
+
+// Интеграция с расширенными возможностями в основной класс ShamanAI
+Object.assign(ShamanAI.prototype, {
+    mathSolver: new MathSolver(),
+    graphRenderer: new AdvancedGraphRenderer(),
+    physicsEngine: new PhysicsEngine(),
+
+    async processAdvancedQuery(message, imageData = null) {
+        this.showTypingIndicator();
+        
+        // Имитация сложных вычислений
+        await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+        
+        let response = "";
+        
+        if (imageData) {
+            response = await this.analyzeComplexImage(imageData);
+        } else {
+            response = await this.generateAdvancedResponse(message);
+        }
+        
+        this.hideTypingIndicator();
+        return response;
+    },
+
+    async analyzeComplexImage(imageData) {
+        let analysis = "🔍 **Расширенный анализ изображения:**\n\n";
+        
+        try {
+            // OCR с улучшенными настройками
+            await this.ocrWorker.setParameters({
+                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,!?+-=(){}[]/\\'
+            });
+            
+            const { data: { text, lines } } = await this.ocrWorker.recognize(imageData);
+            
+            if (text.trim()) {
+                analysis += `📝 **Распознанный текст:**\n${text}\n\n`;
+                
+                // Анализ математических выражений в тексте
+                const mathExpressions = this.extractMathFromText(text);
+                if (mathExpressions.length > 0) {
+                    analysis += "🧮 **Обнаруженные математические выражения:**\n";
+                    mathExpressions.forEach(expr => {
+                        try {
+                            const result = this.mathSolver.evaluateExpression(expr);
+                            analysis += `${expr} → ${result}\n`;
+                        } catch (e) {
+                            analysis += `${expr} → не удалось вычислить\n`;
+                        }
+                    });
+                    analysis += "\n";
+                }
+            }
+
+            // Расширенный анализ объектов
+            const objects = await this.mlModels.objectDetection.detect(imageData);
+            if (objects.length > 0) {
+                analysis += "🎯 **Обнаруженные объекты:**\n";
+                objects.forEach(obj => {
+                    analysis += `• ${obj.class} (${Math.round(obj.score * 100)}% вероятность)\n`;
+                });
+                analysis += "\n";
+            }
+
+            // Анализ физических схем
+            if (this.containsPhysicsElements(objects)) {
+                analysis += "⚡ **Обнаружена физическая схема/диаграмма**\n";
+                analysis += "Могу помочь с анализом электрических цепей, механических систем и т.д.\n\n";
+            }
+
+        } catch (error) {
+            analysis = "❌ Ошибка при расширенном анализе изображения";
+        }
+        
+        return analysis;
+    },
+
+    extractMathFromText(text) {
+        const mathPatterns = [
+            /[0-9]+\s*[+\-*/]\s*[0-9]+/g,
+            /[xy]\s*=\s*[^,\n]+/g,
+            /[0-9]+\s*\/\s*[0-9]+/g,
+            /sqrt\([^)]+\)/g,
+            /sin\([^)]+\)|cos\([^)]+\)|tan\([^)]+\)/g
+        ];
+        
+        const expressions = [];
+        mathPatterns.forEach(pattern => {
+            const matches = text.match(pattern);
+            if (matches) expressions.push(...matches);
+        });
+        
+        return expressions.slice(0, 5); // Ограничиваем количество
+    },
+
+    containsPhysicsElements(objects) {
+        const physicsKeywords = ['circuit', 'battery', 'resistor', 'capacitor', 'spring', 'pulley'];
+        return objects.some(obj => 
+            physicsKeywords.some(keyword => 
+                obj.class.toLowerCase().includes(keyword)
+            )
+        );
+    },
+
+    generateAdvancedResponse(message) {
+        const lowerMessage = message.toLowerCase();
+        
+        // Обработка математических запросов
+        if (this.isMathQuery(lowerMessage)) {
+            return this.handleMathQuery(message);
+        }
+        
+        // Обработка физических запросов
+        if (this.isPhysicsQuery(lowerMessage)) {
+            return this.handlePhysicsQuery(message);
+        }
+        
+        // Обработка запросов на графики
+        if (this.isGraphQuery(lowerMessage)) {
+            return this.handleAdvancedGraphRequest(message);
+        }
+        
+        return this.generateSmartResponse(message);
+    },
+
+    isMathQuery(message) {
+        const mathKeywords = ['реши', 'вычисли', 'уравнение', 'производная', 'интеграл', 'алгебра', 'математика'];
+        return mathKeywords.some(keyword => message.includes(keyword));
+    },
+
+    isPhysicsQuery(message) {
+        const physicsKeywords = ['физика', 'кинематика', 'динамика', 'электричество', 'оптика', 'термодинамика'];
+        return physicsKeywords.some(keyword => message.includes(keyword));
+    },
+
+    isGraphQuery(message) {
+        const graphKeywords = ['график', 'построй', 'диаграмма', 'plot', 'chart'];
+        return graphKeywords.some(keyword => message.includes(keyword));
+    },
+
+    handleMathQuery(message) {
+        try {
+            // Попытка решить как уравнение
+            if (message.includes('=')) {
+                return this.mathSolver.solveEquation(message);
+            }
+            
+            // Попытка вычислить выражение
+            const cleanExpr = message.replace(/[^0-9xX+\-*/().,]/g, '');
+            if (cleanExpr) {
+                return this.mathSolver.evaluateExpression(cleanExpr);
+            }
+            
+            return "Пожалуйста, укажите математическое выражение или уравнение для решения";
+        } catch (error) {
+            return "Не удалось обработать математический запрос";
+        }
+    },
+
+    handlePhysicsQuery(message) {
+        let response = "";
+        
+        if (message.includes('кинематика') || message.includes('падение') || message.includes('движение')) {
+            response = this.physicsEngine.solveKinematics(message);
+        } else if (message.includes('динамика') || message.includes('сила') || message.includes('F = ma')) {
+            response = this.physicsEngine.solveDynamics(message);
+        } else {
+            response = this.getPhysicsFormulas(this.extractTopic(message));
+        }
+        
+        return response;
+    },
+
+    handleAdvancedGraphRequest(message) {
+        const funcString = this.extractFunction(message);
+        if (funcString) {
+            try {
+                const graphCanvas = this.graphRenderer.plotFunction(funcString);
+                this.addGraphToChat(graphCanvas);
+                return `✅ Построил график функции: ${funcString}`;
+            } catch (error) {
+                return `❌ Ошибка построения графика: ${funcString}`;
+            }
+        }
+        
+        return "Укажите функцию для построения графика, например: 'y = x^2' или 'sin(x)*x'";
+    },
+
+    addGraphToChat(canvas) {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ai-message';
+        messageDiv.appendChild(canvas);
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+});
+
+// Обновление основной функции processInput для использования расширенных возможностей
+async function processAdvancedInput() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    
+    if (!message && !currentImage) return;
+    
+    if (message) {
+        addMessageToChat(message, 'user');
+        input.value = '';
+        
+        const response = await shamanAI.processAdvancedQuery(message, currentImage);
+        addMessageToChat(response, 'ai');
+        
+        // Обновление вывода
+        document.getElementById('mathOutput').innerHTML = response.replace(/\n/g, '<br>');
+        
+        currentImage = null;
+        document.getElementById('previewCanvas').style.display = 'none';
+    }
+}
+
+// Замена основной функции обработки
+window.processInput = processAdvancedInput;
+
+// Дополнительные стили для улучшенного интерфейса
+const additionalStyles = `
+    .advanced-math {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border-left: 4px solid var(--accent);
+    }
+    
+    .physics-diagram {
+        background: rgba(0, 206, 209, 0.1);
+        border: 2px solid var(--secondary);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+    }
+    
+    .solution-step {
+        margin: 8px 0;
+        padding-left: 20px;
+        border-left: 3px solid var(--accent);
+    }
+    
+    .error-message {
+        color: #ff4444;
+        background: rgba(255, 68, 68, 0.1);
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ff4444;
+    }
+    
+    .success-message {
+        color: #00ff88;
+        background: rgba(0, 255, 136, 0.1);
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #00ff88;
+    }
+`;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = additionalStyles;
+document.head.appendChild(styleSheet);
+</script>
+<script>
+// Система интеграции с Telegram данными
+class TelegramIntegration {
+    constructor() {
+        this.telegramChatId = "-2285349353";
+        this.cachedData = {
+            formulas: [],
+            homeworks: [],
+            pdfContents: []
+        };
+        this.init();
+    }
+
+    async init() {
+        await this.loadCachedData();
+        await this.simulateTelegramData();
+    }
+
+    async loadCachedData() {
+        // В реальной реализации здесь будет загрузка из Telegram API
+        // Сейчас используем симуляцию данных
+        this.cachedData = {
+            formulas: [
+                "Кинематика: v = v₀ + at",
+                "Кинематика: s = v₀t + at²/2",
+                "Кинематика: v² = v₀² + 2as",
+                "Динамика: F = ma", 
+                "Динамика: Fтр = μN",
+                "Электричество: I = U/R",
+                "Электричество: P = UI",
+                "Электричество: Q = I²Rt",
+                "Оптика: n = c/v",
+                "Оптика: 1/F = 1/d + 1/f",
+                "Термодинамика: Q = cmΔT",
+                "Термодинамика: pV = νRT"
+            ],
+            homeworks: {
+                "9": [
+                    "§15-16: Задачи на законы Ньютона №1-5",
+                    "§17: Движение под углом к горизонту №1-3",
+                    "§20: Закон сохранения энергии №2-6"
+                ],
+                "10": [
+                    "§25-26: Молекулярная физика №1-4",
+                    "§30: Первый закон термодинамики №3-7", 
+                    "§35: Электростатика №1-5"
+                ],
+                "11": [
+                    "§40-41: Квантовая физика №2-6",
+                    "§45: Ядерные реакции №1-4",
+                    "§50: Оптика №3-8"
+                ]
+            },
+            pdfContents: [
+                "Физика 9 класс: Кинематика и динамика",
+                "Физика 10 класс: Молекулярная физика",
+                "Физика 11 класс: Квантовая физика",
+                "Сборник задач по физике 9-11 класс",
+                "Лабораторные работы по физике"
+            ]
+        };
+    }
+
+    async simulateTelegramData() {
+        // Имитация получения данных из Telegram
+        console.log("Загружены данные из Telegram чата физики");
+    }
+
+    searchFormulas(query) {
+        const results = this.cachedData.formulas.filter(formula => 
+            formula.toLowerCase().includes(query.toLowerCase())
+        );
+        return results.length > 0 ? results : ["Формулы не найдены в базе Telegram"];
+    }
+
+    getHomeworkByGrade(grade) {
+        return this.cachedData.homeworks[grade] || ["ДЗ для этого класса не найдено"];
+    }
+
+    searchPDFs(query) {
+        return this.cachedData.pdfContents.filter(pdf => 
+            pdf.toLowerCase().includes(query.toLowerCase())
+        );
+    }
+
+    // Имитация загрузки реальных PDF файлов
+    async loadPDFContent(pdfName) {
+        const pdfContents = {
+            "Физика 9 класс: Кинематика и динамика": `
+                КИНЕМАТИКА
+                1. Равномерное движение: s = vt
+                2. Равноускоренное движение: 
+                   v = v₀ + at
+                   s = v₀t + at²/2
+                   v² = v₀² + 2as
+                
+                ДИНАМИКА  
+                1. Второй закон Ньютона: F = ma
+                2. Сила трения: Fтр = μN
+                3. Сила упругости: Fупр = kx
+            `,
+            "Сборник задач по физике 9-11 класс": `
+                ЗАДАЧИ ПО ФИЗИКЕ
+                
+                9 КЛАСС:
+                1. Тело движется со скоростью 5 м/с. Найти путь за 10 с.
+                2. Найти ускорение тела массой 2 кг под действием силы 10 Н.
+                
+                10 КЛАСС:
+                1. Найти количество теплоты для нагрева 1 кг воды на 50°C.
+                2. Рассчитать давление идеального газа при заданных параметрах.
+            `
+        };
+        
+        return pdfContents[pdfName] || "Содержание PDF не найдено";
+    }
+}
+
+// Расширенная система домашних заданий с учетом Telegram данных
+class AdvancedHomeworkSystem {
+    constructor() {
+        this.telegram = new TelegramIntegration();
+    }
+
+    generateHomework(grade, topic = null) {
+        let homework = this.telegram.getHomeworkByGrade(grade);
+        
+        if (topic) {
+            // Фильтрация по теме
+            homework = homework.filter(task => 
+                task.toLowerCase().includes(topic.toLowerCase())
+            );
+            if (homework.length === 0) {
+                homework = this.generateCustomHomework(grade, topic);
+            }
+        }
+
+        return homework;
+    }
+
+    generateCustomHomework(grade, topic, difficulty = 'medium') {
+        const templates = {
+            'easy': [
+                `Решите 5 простых задач по теме "${topic}"`,
+                `Выучите основные формулы по теме "${topic}"`,
+                `Прочитайте параграф по теме "${topic}" и составьте конспект`
+            ],
+            'medium': [
+                `Решите 3 задачи средней сложности по теме "${topic}"`,
+                `Подготовьте доклад по теме "${topic}"`,
+                `Проведите эксперимент (если возможно) по теме "${topic}" и опишите результаты`
+            ],
+            'hard': [
+                `Решите 2 сложные задачи по теме "${topic}"`,
+                `Напишите реферат по теме "${topic}" с использованием дополнительных источников`,
+                `Разработайте презентацию по теме "${topic}"`
+            ]
+        };
+
+        return templates[difficulty] || templates['medium'];
+    }
+
+    analyzeHomeworkFromImage(imageData) {
+        // В реальной реализации здесь будет анализ скриншота ДЗ
+        return {
+            subject: "физика",
+            grade: "9",
+            topics: ["кинематика", "динамика"],
+            tasks: [
+                "Решить задачи на равномерное движение",
+                "Выучить формулы кинематики"
+            ]
+        };
+    }
+}
+
+// Система визуального анализа для скриншотов и рукописного текста
+class VisualAnalysisSystem {
+    constructor() {
+        this.recognitionModels = {};
+    }
+
+    async analyzeScreenshot(imageData) {
+        const analysis = {
+            text: "",
+            formulas: [],
+            diagrams: [],
+            homeworkInfo: null
+        };
+
+        try {
+            // OCR для основного текста
+            const { data: { text } } = await Tesseract.recognize(imageData, 'rus+eng', {
+                tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+                tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,!?+-=(){}[]/\\'
+            });
+            
+            analysis.text = text;
+
+            // Поиск формул в тексте
+            analysis.formulas = this.extractFormulas(text);
+            
+            // Анализ на домашнее задание
+            if (this.isHomeworkRelated(text)) {
+                analysis.homeworkInfo = this.extractHomeworkInfo(text);
+            }
+
+            // Обнаружение графиков и схем
+            const objects = await cocoSsd.detect(imageData);
+            analysis.diagrams = objects.filter(obj => 
+                ['graph', 'chart', 'diagram', 'drawing'].some(keyword => 
+                    obj.class.toLowerCase().includes(keyword)
+                )
+            );
+
+        } catch (error) {
+            console.error("Ошибка анализа скриншота:", error);
+        }
+
+        return analysis;
+    }
+
+    extractFormulas(text) {
+        const formulaPatterns = [
+            /[a-zA-Zα-ωΑ-Ω]\s*=\s*[^,\n]+/g,
+            /[a-zA-Zα-ωΑ-Ω]_{?[0-9a-zA-Z]+}?\s*=\s*[^,\n]+/g,
+            /[0-9]+\s*[+\-*/^]\s*[0-9]+/g,
+            /sin\([^)]+\)|cos\([^)]+\)|tan\([^)]+\)/g,
+            /sqrt\([^)]+\)|∫[^,\n]+d[a-zA-Z]/g
+        ];
+
+        const formulas = [];
+        formulaPatterns.forEach(pattern => {
+            const matches = text.match(pattern);
+            if (matches) {
+                formulas.push(...matches.slice(0, 3));
+            }
+        });
+
+        return formulas;
+    }
+
+    isHomeworkRelated(text) {
+        const keywords = ['дз', 'домашнее', 'homework', 'задание', 'упражнение', 'задача'];
+        return keywords.some(keyword => text.toLowerCase().includes(keyword));
+    }
+
+    extractHomeworkInfo(text) {
+        const gradeMatch = text.match(/(\d+)\s*(класс|class)/i);
+        const subjectMatch = text.match(/(физика|математика|physics|math)/i);
+        
+        return {
+            grade: gradeMatch ? gradeMatch[1] : null,
+            subject: subjectMatch ? subjectMatch[1].toLowerCase() : null,
+            tasks: this.extractTasks(text)
+        };
+    }
+
+    extractTasks(text) {
+        const taskPatterns = [
+            /\d+\.\s*[^.\n]+/g,
+            /№\s*\d+[^.\n]*/g,
+            /[Зз]адача\s*\d+[^.\n]*/g
+        ];
+
+        const tasks = [];
+        taskPatterns.forEach(pattern => {
+            const matches = text.match(pattern);
+            if (matches) {
+                tasks.push(...matches.slice(0, 5));
+            }
+        });
+
+        return tasks.length > 0 ? tasks : ["Задачи не обнаружены в тексте"];
+    }
+
+    async analyzeHandwrittenText(imageData) {
+        // Специальные настройки для рукописного текста
+        await Tesseract.setParameters({
+            tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+            tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,!?+-=()'
+        });
+
+        const { data: { text } } = await Tesseract.recognize(imageData);
+        return {
+            text: text,
+            confidence: "Средняя", // В реальной реализации будет оценка уверенности
+            formulas: this.extractFormulas(text)
+        };
+    }
+}
+
+// Интеграция новых систем в основной класс ShamanAI
+Object.assign(ShamanAI.prototype, {
+    telegramIntegration: new TelegramIntegration(),
+    homeworkSystem: new AdvancedHomeworkSystem(),
+    visualAnalysis: new VisualAnalysisSystem(),
+
+    async processTelegramRequest(message) {
+        let response = "📡 **Результаты из Telegram чата:**\n\n";
+        
+        if (message.includes('формул')) {
+            const query = this.extractSearchQuery(message);
+            const formulas = this.telegramIntegration.searchFormulas(query);
+            response += `📚 Формулы по запросу "${query}":\n${formulas.join('\n')}`;
+        }
+        else if (message.includes('дз') || message.includes('домашк')) {
+            const grade = this.extractGrade(message);
+            const topic = this.extractTopic(message);
+            const homework = this.homeworkSystem.generateHomework(grade, topic);
+            response += `📝 Домашнее задание для ${grade} класса:\n${homework.join('\n')}`;
+        }
+        else if (message.includes('pdf') || message.includes('пдф')) {
+            const query = this.extractSearchQuery(message);
+            const pdfs = this.telegramIntegration.searchPDFs(query);
+            response += `📄 PDF файлы:\n${pdfs.join('\n')}`;
+        }
+        else {
+            response += "Доступные команды для Telegram:\n- 'Найди формулы по ...'\n- 'ДЗ для 9 класса'\n- 'PDF по физике'";
+        }
+        
+        return response;
+    },
+
+    extractSearchQuery(message) {
+        // Извлекаем поисковый запрос, убирая стоп-слова
+        const stopWords = ['найди', 'формулы', 'по', 'для', 'теме', 'какие', 'что', 'покажи'];
+        const words = message.split(' ').filter(word => 
+            !stopWords.includes(word.toLowerCase())
+        );
+        return words.join(' ') || 'физика';
+    },
+
+    async analyzeComplexImage(imageData) {
+        let analysis = "🔍 **Расширенный анализ изображения:**\n\n";
+        
+        try {
+            // Определяем тип изображения
+            const imageType = await this.detectImageType(imageData);
+            
+            switch(imageType) {
+                case 'screenshot':
+                    analysis += await this.analyzeScreenshot(imageData);
+                    break;
+                case 'handwritten':
+                    analysis += await this.analyzeHandwritten(imageData);
+                    break;
+                case 'graph':
+                    analysis += await this.analyzeGraph(imageData);
+                    break;
+                case 'diagram':
+                    analysis += await this.analyzeDiagram(imageData);
+                    break;
+                default:
+                    analysis += await this.analyzeGeneralImage(imageData);
+            }
+            
+        } catch (error) {
+            analysis = "❌ Ошибка при расширенном анализе изображения";
+        }
+        
+        return analysis;
+    },
+
+    async detectImageType(imageData) {
+        const objects = await cocoSsd.detect(imageData);
+        const text = await this.performOCR(imageData);
+        
+        if (text.includes('дз') || text.includes('домашнее') || text.includes('задание')) {
+            return 'screenshot';
+        }
+        
+        if (objects.some(obj => ['graph', 'chart'].includes(obj.class))) {
+            return 'graph';
+        }
+        
+        if (objects.some(obj => ['diagram', 'drawing', 'circuit'].includes(obj.class))) {
+            return 'diagram';
+        }
+        
+        // Простая эвристика для рукописного текста
+        if (text.length > 0 && text.split('\n').length <= 5) {
+            return 'handwritten';
+        }
+        
+        return 'general';
+    },
+
+    async analyzeScreenshot(imageData) {
+        const analysis = await this.visualAnalysis.analyzeScreenshot(imageData);
+        let result = "📱 **Анализ скриншота:**\n\n";
+        
+        if (analysis.text) {
+            result += `📝 Текст: ${analysis.text.substring(0, 200)}...\n\n`;
+        }
+        
+        if (analysis.formulas.length > 0) {
+            result += `🧮 Обнаружены формулы:\n${analysis.formulas.join('\n')}\n\n`;
+        }
+        
+        if (analysis.homeworkInfo) {
+            result += `📚 Информация о ДЗ:\n`;
+            result += `Класс: ${analysis.homeworkInfo.grade || 'не определен'}\n`;
+            result += `Предмет: ${analysis.homeworkInfo.subject || 'не определен'}\n`;
+            result += `Задачи: ${analysis.homeworkInfo.tasks.join(', ')}\n\n`;
+        }
+        
+        return result;
+    },
+
+    async analyzeHandwritten(imageData) {
+        const analysis = await this.visualAnalysis.analyzeHandwrittenText(imageData);
+        let result = "✍️ **Анализ рукописного текста:**\n\n";
+        
+        result += `📝 Распознанный текст: ${analysis.text || 'не удалось распознать'}\n`;
+        result += `🎯 Уверенность: ${analysis.confidence}\n`;
+        
+        if (analysis.formulas.length > 0) {
+            result += `\n🧮 Обнаружены формулы:\n${analysis.formulas.join('\n')}\n`;
+            
+            // Попытка решить обнаруженные формулы
+            analysis.formulas.forEach(formula => {
+                try {
+                    const solution = this.mathSolver.solveEquation(formula);
+                    result += `➡️ ${formula} → ${solution}\n`;
+                } catch (e) {
+                    // Игнорируем ошибки решения
+                }
+            });
+        }
+        
+        return result;
+    },
+
+    async analyzeGraph(imageData) {
+        const objects = await cocoSsd.detect(imageData);
+        let result = "📊 **Анализ графика:**\n\n";
+        
+        result += "Обнаружен график/диаграмма\n";
+        result += `Тип: ${objects.map(obj => obj.class).join(', ')}\n\n`;
+        result += "Могу помочь с:\n- Построением аналогичного графика\n- Анализом данных графика\n- Решением уравнений по графику";
+        
+        return result;
+    },
+
+    async analyzeDiagram(imageData) {
+        let result = "🔧 **Анализ схемы/диаграммы:**\n\n";
+        
+        result += "Обнаружена техническая схема\n";
+        result += "Могу помочь с:\n- Объяснением принципа работы\n- Расчетом параметров системы\n- Построением аналогичной схемы";
+        
+        return result;
+    },
+
+    async performOCR(imageData) {
+        try {
+            const { data: { text } } = await Tesseract.recognize(imageData);
+            return text;
+        } catch (error) {
+            return "";
+        }
+    }
+});
+
+// Обновление интерфейса для новых возможностей
+function addTelegramFeatures() {
+    const toolsPanel = document.querySelector('.tools-panel');
+    
+    const telegramSection = document.createElement('div');
+    telegramSection.className = 'tool-section';
+    telegramSection.innerHTML = `
+        <h3 class="tool-title">📡 Telegram данные</h3>
+        <button class="button" onclick="quickTelegramAction('formulas')" style="width: 100%; margin-bottom: 10px;">Все формулы</button>
+        <button class="button" onclick="quickTelegramAction('homework')" style="width: 100%; margin-bottom: 10px;">ДЗ из чата</button>
+        <button class="button" onclick="quickTelegramAction('pdf')" style="width: 100%; margin-bottom: 10px;">PDF файлы</button>
+    `;
+    
+    toolsPanel.appendChild(telegramSection);
+}
+
+function quickTelegramAction(action) {
+    const actions = {
+        'formulas': shamanAI.telegramIntegration.cachedData.formulas.join('\n'),
+        'homework': shamanAI.homeworkSystem.generateHomework('9').join('\n'),
+        'pdf': shamanAI.telegramIntegration.cachedData.pdfContents.join('\n')
+    };
+    
+    addMessageToChat(actions[action], 'ai');
+    document.getElementById('mathOutput').textContent = actions[action];
+}
+
+// Инициализация Telegram функций при загрузке
+window.addEventListener('load', function() {
+    addTelegramFeatures();
+});
+
+// Дополнительные стили для Telegram раздела
+const telegramStyles = `
+    .telegram-data {
+        background: linear-gradient(135deg, var(--primary), #9370DB);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border: 1px solid var(--accent);
+    }
+    
+    .homework-list {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .homework-list li {
+        margin: 8px 0;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        border-left: 3px solid var(--secondary);
+    }
+    
+    .formula-item {
+        font-family: 'Courier New', monospace;
+        margin: 5px 0;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 5px;
+    }
+    
+    .analysis-result {
+        background: rgba(0, 206, 209, 0.1);
+        border: 1px solid var(--secondary);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+`;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = telegramStyles;
+document.head.appendChild(styleSheet);
+</script>
+<script>
+// Главный класс ShamanAI с полной интеграцией всех систем
+class CompleteShamanAI {
+    constructor() {
+        this.isInitialized = false;
+        this.optimizer = new PerformanceOptimizer();
+        this.mathSolver = new AdvancedMathSolver();
+        this.physicsEngine = new PhysicsEngine();
+        this.graphRenderer = new AdvancedGraphRenderer();
+        this.telegramIntegration = new TelegramIntegration();
+        this.homeworkSystem = new AdvancedHomeworkSystem();
+        this.visualAnalysis = new VisualAnalysisSystem();
+        this.ocrWorker = null;
+        this.mlModels = {};
+        this.chatHistory = [];
+        this.userContext = {
+            currentSubject: 'general',
+            gradeLevel: '9',
+            preferredLanguage: 'ru'
+        };
+        
+        this.init();
+    }
+
+    async init() {
+        try {
+            await this.loadAllModels();
+            await this.telegramIntegration.init();
+            await this.setupOCR();
+            this.isInitialized = true;
+            this.addMessage("🚀 ShamanAI полностью инициализирован! Готов решать задачи по математике, физике, анализировать изображения и работать с данными из Telegram.", "ai");
+            console.log("ShamanAI: Все системы активированы");
+        } catch (error) {
+            console.error("ShamanAI: Ошибка инициализации", error);
+            this.addMessage("⚠️ Часть функций может быть недоступна. Основные возможности работают.", "ai");
+        }
+    }
+
+    async loadAllModels() {
+        // Параллельная загрузка всех моделей
+        await Promise.all([
+            this.loadMLModels(),
+            this.loadMathModels(),
+            this.loadPhysicsData()
+        ]);
+    }
+
+    async loadMLModels() {
+        try {
+            this.mlModels = {
+                objectDetection: await cocoSsd.load(),
+                imageClassification: await mobilenet.load()
+            };
+            console.log("ShamanAI: ML модели загружены");
+        } catch (error) {
+            console.warn("ShamanAI: Не удалось загрузить ML модели");
+        }
+    }
+
+    async loadMathModels() {
+        // Загрузка математических моделей
+        await this.mathSolver.init();
+    }
+
+    async loadPhysicsData() {
+        // Загрузка физических данных и констант
+        await this.physicsEngine.loadConstants();
+    }
+
+    async setupOCR() {
+        try {
+            this.ocrWorker = await Tesseract.createWorker('rus+eng', 1, {
+                logger: m => console.log(m)
+            });
+            await this.ocrWorker.setParameters({
+                tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+                tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZабвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ .,!?+-=(){}[]/\\^'
+            });
+        } catch (error) {
+            console.warn("ShamanAI: OCR не доступен");
+        }
+    }
+
+    async processMessage(message, imageData = null) {
+        if (!this.isInitialized) {
+            return "Система инициализируется...";
+        }
+
+        this.showTypingIndicator();
+        
+        try {
+            let response;
+            
+            // Определение типа запроса
+            const queryType = this.analyzeQueryType(message, imageData);
+            
+            switch(queryType) {
+                case 'math_problem':
+                    response = await this.solveMathProblem(message);
+                    break;
+                case 'physics_problem':
+                    response = await this.solvePhysicsProblem(message);
+                    break;
+                case 'image_analysis':
+                    response = await this.analyzeImageContent(imageData);
+                    break;
+                case 'graph_request':
+                    response = await this.handleGraphRequest(message);
+                    break;
+                case 'homework_request':
+                    response = await this.generateHomeworkResponse(message);
+                    break;
+                case 'telegram_query':
+                    response = await this.processTelegramRequest(message);
+                    break;
+                case 'general_question':
+                default:
+                    response = await this.generateSmartResponse(message);
+            }
+            
+            this.hideTypingIndicator();
+            this.updateUserContext(message);
+            return response;
+            
+        } catch (error) {
+            this.hideTypingIndicator();
+            return this.handleError(error, message);
+        }
+    }
+
+    analyzeQueryType(message, imageData) {
+        if (imageData) return 'image_analysis';
+        
+        const lowerMessage = message.toLowerCase();
+        
+        if (this.containsMathKeywords(lowerMessage)) return 'math_problem';
+        if (this.containsPhysicsKeywords(lowerMessage)) return 'physics_problem';
+        if (this.containsGraphKeywords(lowerMessage)) return 'graph_request';
+        if (this.containsHomeworkKeywords(lowerMessage)) return 'homework_request';
+        if (this.containsTelegramKeywords(lowerMessage)) return 'telegram_query';
+        
+        return 'general_question';
+    }
+
+    containsMathKeywords(message) {
+        const keywords = ['реши', 'вычисли', 'уравнение', 'пример', 'посчитай', 'алгебра', 'математика', 'формула', 'выражение'];
+        return keywords.some(keyword => message.includes(keyword));
+    }
+
+    containsPhysicsKeywords(message) {
+        const keywords = ['физика', 'кинематика', 'динамика', 'электричество', 'оптика', 'термодинамика', 'механика', 'закон'];
+        return keywords.some(keyword => message.includes(keyword));
+    }
+
+    containsGraphKeywords(message) {
+        const keywords = ['график', 'построй', 'диаграмма', 'chart', 'plot', 'функция'];
+        return keywords.some(keyword => message.includes(keyword));
+    }
+
+    containsHomeworkKeywords(message) {
+        const keywords = ['дз', 'домашнее', 'homework', 'задание', 'упражнение'];
+        return keywords.some(keyword => message.includes(keyword));
+    }
+
+    containsTelegramKeywords(message) {
+        const keywords = ['телеграм', 'telegram', 'чат', 'канал'];
+        return keywords.some(keyword => message.includes(keyword));
+    }
+
+    async solveMathProblem(message) {
+        try {
+            let response = "🧮 **Математическое решение:**\n\n";
+            
+            // Извлечение математических выражений
+            const expressions = this.extractMathExpressions(message);
+            
+            if (expressions.length > 0) {
+                expressions.forEach(expr => {
+                    try {
+                        const solution = this.mathSolver.solve(expr);
+                        response += `📝 ${expr}\n➡️ ${solution}\n\n`;
+                    } catch (error) {
+                        response += `📝 ${expr}\n❌ Не удалось решить\n\n`;
+                    }
+                });
+            } else {
+                // Попытка решить как уравнение
+                if (message.includes('=')) {
+                    const solution = this.mathSolver.solveEquation(message);
+                    response += solution;
+                } else {
+                    response += "Укажите математическое выражение или уравнение для решения.";
+                }
+            }
+            
+            return response;
+        } catch (error) {
+            return "Не удалось решить математическую задачу. Попробуйте сформулировать иначе.";
+        }
+    }
+
+    async solvePhysicsProblem(message) {
+        let response = "⚡ **Решение по физике:**\n\n";
+        
+        const topic = this.extractTopic(message);
+        const formulas = this.telegramIntegration.searchFormulas(topic);
+        
+        response += `📚 Формулы по теме "${topic}":\n`;
+        formulas.slice(0, 5).forEach(formula => {
+            response += `• ${formula}\n`;
+        });
+        response += "\n";
+        
+        // Попытка численного решения
+        try {
+            const numericalSolution = this.physicsEngine.solveProblem(message);
+            if (numericalSolution) {
+                response += `🔢 Численное решение:\n${numericalSolution}\n`;
+            }
+        } catch (error) {
+            response += "Для численного решения укажите конкретные значения параметров.\n";
+        }
+        
+        return response;
+    }
+
+    async analyzeImageContent(imageData) {
+        let response = "🔍 **Анализ изображения:**\n\n";
+        
+        try {
+            // Определение типа изображения
+            const imageType = await this.detectImageType(imageData);
+            response += `📊 Тип: ${this.getImageTypeName(imageType)}\n\n`;
+            
+            // Анализ в зависимости от типа
+            switch(imageType) {
+                case 'handwritten':
+                    const handwrittenAnalysis = await this.visualAnalysis.analyzeHandwrittenText(imageData);
+                    response += this.formatHandwrittenAnalysis(handwrittenAnalysis);
+                    break;
+                    
+                case 'screenshot':
+                    const screenshotAnalysis = await this.visualAnalysis.analyzeScreenshot(imageData);
+                    response += this.formatScreenshotAnalysis(screenshotAnalysis);
+                    break;
+                    
+                case 'graph':
+                    response += "📈 Обнаружен график. Могу построить аналогичный или проанализировать данные.\n";
+                    break;
+                    
+                case 'diagram':
+                    response += "🔧 Обнаружена схема/диаграмма. Могу объяснить принцип работы или создать аналогичную.\n";
+                    break;
+                    
+                default:
+                    const generalAnalysis = await this.performGeneralImageAnalysis(imageData);
+                    response += generalAnalysis;
+            }
+            
+            // Дополнительный анализ объектов
+            if (this.mlModels.objectDetection) {
+                const objects = await this.mlModels.objectDetection.detect(imageData);
+                if (objects.length > 0) {
+                    response += "\n🎯 Обнаруженные объекты:\n";
+                    objects.slice(0, 5).forEach(obj => {
+                        response += `• ${obj.class} (${Math.round(obj.score * 100)}%)\n`;
+                    });
+                }
+            }
+            
+        } catch (error) {
+            response += "❌ Ошибка анализа изображения. Убедитесь, что файл корректен.\n";
+        }
+        
+        return response;
+    }
+
+    async detectImageType(imageData) {
+        // Используем комбинацию OCR и компьютерного зрения
+        let text = "";
+        try {
+            const { data: { text: ocrText } } = await this.ocrWorker.recognize(imageData);
+            text = ocrText;
+        } catch (error) {
+            console.warn("OCR недоступен");
+        }
+        
+        let objects = [];
+        if (this.mlModels.objectDetection) {
+            objects = await this.mlModels.objectDetection.detect(imageData);
+        }
+        
+        // Эвристики для определения типа
+        if (text.length > 0) {
+            if (text.includes('дз') || text.includes('домашнее') || text.includes('задание')) {
+                return 'screenshot';
+            }
+            
+            const lineCount = text.split('\n').length;
+            if (lineCount <= 3 && text.length < 100) {
+                return 'handwritten';
+            }
+        }
+        
+        if (objects.some(obj => ['graph', 'chart'].includes(obj.class))) {
+            return 'graph';
+        }
+        
+        if (objects.some(obj => ['diagram', 'drawing', 'circuit'].includes(obj.class))) {
+            return 'diagram';
+        }
+        
+        return 'general';
+    }
+
+    getImageTypeName(type) {
+        const names = {
+            'handwritten': 'Рукописный текст',
+            'screenshot': 'Скриншот/документ',
+            'graph': 'График/диаграмма',
+            'diagram': 'Схема/чертеж',
+            'general': 'Общее изображение'
+        };
+        return names[type] || 'Неизвестный тип';
+    }
+
+    formatHandwrittenAnalysis(analysis) {
+        let response = "✍️ **Рукописный текст:**\n";
+        response += `📝 ${analysis.text || "Текст не распознан"}\n\n`;
+        
+        if (analysis.formulas && analysis.formulas.length > 0) {
+            response += "🧮 Обнаружены формулы:\n";
+            analysis.formulas.forEach(formula => {
+                response += `• ${formula}\n`;
+            });
+        }
+        
+        return response;
+    }
+
+    formatScreenshotAnalysis(analysis) {
+        let response = "📱 **Анализ документа:**\n";
+        
+        if (analysis.text) {
+            const preview = analysis.text.length > 150 ? 
+                analysis.text.substring(0, 150) + "..." : analysis.text;
+            response += `📄 ${preview}\n\n`;
+        }
+        
+        if (analysis.homeworkInfo) {
+            response += "📚 **Информация о задании:**\n";
+            if (analysis.homeworkInfo.grade) {
+                response += `🏫 Класс: ${analysis.homeworkInfo.grade}\n`;
+            }
+            if (analysis.homeworkInfo.subject) {
+                response += `📖 Предмет: ${analysis.homeworkInfo.subject}\n`;
+            }
+            if (analysis.homeworkInfo.tasks) {
+                response += `📝 Задачи: ${analysis.homeworkInfo.tasks.join(', ')}\n`;
+            }
+        }
+        
+        return response;
+    }
+
+    async performGeneralImageAnalysis(imageData) {
+        let response = "";
+        
+        try {
+            if (this.ocrWorker) {
+                const { data: { text } } = await this.ocrWorker.recognize(imageData);
+                if (text.trim()) {
+                    response += `📝 Распознанный текст:\n${text.substring(0, 200)}...\n\n`;
+                }
+            }
+            
+            if (this.mlModels.imageClassification) {
+                const predictions = await this.mlModels.imageClassification.classify(imageData);
+                if (predictions.length > 0) {
+                    response += "🏷️ Классификация изображения:\n";
+                    predictions.slice(0, 3).forEach(pred => {
+                        response += `• ${pred.className} (${Math.round(pred.probability * 100)}%)\n`;
+                    });
+                }
+            }
+        } catch (error) {
+            response += "ℹ️ Базовый анализ завершен\n";
+        }
+        
+        return response;
+    }
+
+    async handleGraphRequest(message) {
+        const funcString = this.extractFunction(message);
+        if (funcString) {
+            try {
+                const graphCanvas = this.graphRenderer.plotFunction(funcString);
+                this.addGraphToChat(graphCanvas);
+                return `✅ Построил график функции: ${funcString}`;
+            } catch (error) {
+                return `❌ Ошибка построения графика: ${funcString}`;
+            }
+        }
+        
+        return "Укажите функцию для построения графика. Пример: 'y = x^2' или 'sin(x)*x'";
+    }
+
+    async generateHomeworkResponse(message) {
+        const grade = this.extractGrade(message);
+        const topic = this.extractTopic(message);
+        
+        let response = `📝 **Домашнее задание для ${grade} класса:**\n\n`;
+        
+        // Получаем ДЗ из Telegram
+        const telegramHomework = this.homeworkSystem.generateHomework(grade, topic);
+        response += "📡 Из Telegram чата:\n";
+        telegramHomework.forEach(task => {
+            response += `• ${task}\n`;
+        });
+        
+        // Генерируем дополнительное задание
+        response += "\n🎯 Дополнительные задачи:\n";
+        const customHomework = this.homeworkSystem.generateCustomHomework(grade, topic || 'физика');
+        customHomework.forEach(task => {
+            response += `• ${task}\n`;
+        });
+        
+        return response;
+    }
+
+    extractMathExpressions(text) {
+        const patterns = [
+            /[0-9]+\s*[+\-*/^]\s*[0-9]+/g,
+            /[xy]\s*=\s*[^,\n]+/gi,
+            /[a-z]+\s*=\s*[^,\n]+/gi,
+            /sqrt\([^)]+\)/g,
+            /sin\([^)]+\)|cos\([^)]+\)|tan\([^)]+\)/g,
+            /[0-9]+\s*\/\s*[0-9]+/g
+        ];
+        
+        const expressions = [];
+        patterns.forEach(pattern => {
+            const matches = text.match(pattern);
+            if (matches) {
+                expressions.push(...matches.slice(0, 2));
+            }
+        });
+        
+        return [...new Set(expressions)]; // Убираем дубликаты
+    }
+
+    extractFunction(message) {
+        const patterns = [
+            /[yY]\s*=\s*([^,\n]+)/,
+            /функция:\s*([^,\n]+)/i,
+            /график\s+([^,\n]+)/i,
+            /plot\s+([^,\n]+)/i
+        ];
+        
+        for (let pattern of patterns) {
+            const match = message.match(pattern);
+            if (match) return match[1].trim();
+        }
+        
+        // Попытка извлечь математическое выражение
+        const mathExpr = this.extractMathExpressions(message)[0];
+        return mathExpr || null;
+    }
+
+    extractTopic(message) {
+        const topics = ['кинематика', 'динамика', 'электричество', 'оптика', 'термодинамика', 'механика'];
+        const found = topics.find(topic => message.toLowerCase().includes(topic));
+        return found || 'физика';
+    }
+
+    extractGrade(message) {
+        const match = message.match(/(\d+)\s*(?:класс|class)/i);
+        return match ? match[1] : '9';
+    }
+
+    generateSmartResponse(message) {
+        const responses = [
+            "Интересный вопрос! Могу предложить несколько подходов к решению.",
+            "Для более точного ответа уточните, пожалуйста, условие задачи.",
+            "Могу помочь с расчетами, построением графиков или объяснением теории.",
+            "Эта задача требует дополнительного анализа. Давайте рассмотрим её подробнее.",
+            "Могу предложить решение с пошаговым объяснением."
+        ];
+        
+        return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    handleError(error, context) {
+        console.error(`ShamanAI error in ${context}:`, error);
+        
+        const errorMessages = {
+            'math': "❌ Ошибка математических вычислений. Проверьте корректность выражения.",
+            'physics': "❌ Не удалось решить физическую задачу. Уточните параметры.",
+            'image': "❌ Ошибка обработки изображения. Убедитесь, что файл корректен.",
+            'general': "❌ Произошла непредвиденная ошибка. Попробуйте еще раз."
+        };
+        
+        return errorMessages[context] || errorMessages['general'];
+    }
+
+    updateUserContext(message) {
+        // Обновление контекста пользователя для персонализации
+        if (this.containsMathKeywords(message.toLowerCase())) {
+            this.userContext.currentSubject = 'math';
+        } else if (this.containsPhysicsKeywords(message.toLowerCase())) {
+            this.userContext.currentSubject = 'physics';
+        }
+        
+        const gradeMatch = message.match(/(\d+)\s*класс/i);
+        if (gradeMatch) {
+            this.userContext.gradeLevel = gradeMatch[1];
+        }
+    }
+
+    addMessage(content, sender) {
+        this.chatHistory.push({
+            content,
+            sender,
+            timestamp: new Date(),
+            context: { ...this.userContext }
+        });
+        
+        // Ограничение истории для производительности
+        if (this.chatHistory.length > 50) {
+            this.chatHistory = this.chatHistory.slice(-50);
+        }
+    }
+
+    showTypingIndicator() {
+        const indicator = document.getElementById('typingIndicator');
+        if (indicator) indicator.style.display = 'block';
+    }
+
+    hideTypingIndicator() {
+        const indicator = document.getElementById('typingIndicator');
+        if (indicator) indicator.style.display = 'none';
+    }
+
+    addGraphToChat(canvas) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ai-message';
+            messageDiv.appendChild(canvas);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+}
+
+// Система оптимизации производительности
+class PerformanceOptimizer {
+    constructor() {
+        this.cache = new Map();
+        this.cacheDuration = 5 * 60 * 1000; // 5 минут
+    }
+
+    set(key, value) {
+        this.cache.set(key, {
+            value,
+            timestamp: Date.now()
+        });
+    }
+
+    get(key) {
+        const item = this.cache.get(key);
+        if (item && Date.now() - item.timestamp < this.cacheDuration) {
+            return item.value;
+        }
+        this.cache.delete(key);
+        return null;
+    }
+
+    clear() {
+        this.cache.clear();
+    }
+}
+
+// Инициализация глобального экземпляра
+let shamanAI;
+let currentImage = null;
+
+window.onload = async function() {
+    shamanAI = new CompleteShamanAI();
+    setupEventListeners();
+    setupAdvancedUI();
+};
+
+function setupEventListeners() {
+    // Обработка Enter в поле ввода
+    document.getElementById('chatInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            processInput();
+        }
+    });
+
+    // Drag and drop для изображений
+    const uploadArea = document.querySelector('.upload-area');
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.style.background = 'rgba(255, 20, 147, 0.2)';
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.style.background = '';
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.style.background = '';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            document.getElementById('fileInput').files = files;
+            handleImageUpload({ target: document.getElementById('fileInput') });
+        }
+    });
+}
+
+function setupAdvancedUI() {
+    // Добавление дополнительных элементов интерфейса
+    const toolsPanel = document.querySelector('.tools-panel');
+    
+    const advancedSection = document.createElement('div');
+    advancedSection.className = 'tool-section';
+    advancedSection.innerHTML = `
+        <h3 class="tool-title">⚡ Быстрые команды</h3>
+        <button class="button" onclick="quickCommand('solve_equation')" style="width: 100%; margin-bottom: 10px;">Решить уравнение</button>
+        <button class="button" onclick="quickCommand('physics_formulas')" style="width: 100%; margin-bottom: 10px;">Формулы физики</button>
+        <button class="button" onclick="quickCommand('generate_homework')" style="width: 100%; margin-bottom: 10px;">Сгенерировать ДЗ</button>
+        <button class="button" onclick="quickCommand('clear_chat')" style="width: 100%; margin-bottom: 10px; background: linear-gradient(45deg, #FF4444, #FF1493);">Очистить чат</button>
+    `;
+    
+    toolsPanel.appendChild(advancedSection);
+}
+
+function quickCommand(command) {
+    const commands = {
+        'solve_equation': 'Реши уравнение: 2*x + 5 = 15',
+        'physics_formulas': 'Покажи формулы по кинематике',
+        'generate_homework': 'Сгенерируй ДЗ по физике для 9 класса',
+        'clear_chat': 'clear'
+    };
+    
+    if (command === 'clear_chat') {
+        clearChat();
+    } else {
+        document.getElementById('chatInput').value = commands[command];
+    }
+}
+
+function clearChat() {
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = '<div class="message ai-message">Чат очищен. Чем могу помочь?</div>';
+}
+
+// Основные функции интерфейса
+function addMessageToChat(message, sender) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}-message`;
+    messageDiv.textContent = message;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function processInput() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    
+    if (!message && !currentImage) return;
+    
+    if (message) {
+        addMessageToChat(message, 'user');
+        input.value = '';
+        
+        const response = await shamanAI.processMessage(message, currentImage);
+        addMessageToChat(response, 'ai');
+        
+        // Обновление вывода
+        document.getElementById('mathOutput').innerHTML = response.replace(/\n/g, '<br>');
+        
+        currentImage = null;
+        const previewCanvas = document.getElementById('previewCanvas');
+        if (previewCanvas) previewCanvas.style.display = 'none';
+    }
+}
+
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Масштабирование с сохранением пропорций
+            const maxWidth = 400;
+            const scale = Math.min(maxWidth / img.width, 1);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.style.display = 'block';
+            
+            currentImage = canvas;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function analyzeImage() {
+    if (!currentImage) {
+        addMessageToChat("Пожалуйста, сначала загрузите изображение", 'ai');
+        return;
+    }
+    
+    addMessageToChat("🖼️ Анализирую загруженное изображение...", 'user');
+    processInput();
+}
+</script>
+
+<style>
+/* Дополнительные улучшенные стили */
+.enhanced-features {
+    background: rgba(138, 43, 226, 0.1);
+    border: 1px solid var(--primary);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.feature-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--secondary);
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-online {
+    background: #00ff00;
+    box-shadow: 0 0 10px #00ff00;
+}
+
+.status-offline {
+    background: #ff4444;
+}
+
+.system-status {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--secondary);
+    font-size: 0.8em;
+}
+
+@media (max-width: 768px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .shaman-title {
+        font-size: 2.5rem;
+    }
+    
+    .chat-messages {
+        height: 400px;
+    }
+    
+    .system-status {
+        position: static;
+        margin-top: 20px;
+    }
+}
+
+/* Анимации */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.loading {
+    animation: pulse 1.5s infinite;
+}
+
+/* Специфические стили для разных типов сообщений */
+.math-solution {
+    border-left: 4px solid #8A2BE2;
+    background: rgba(138, 43, 226, 0.1);
+}
+
+.physics-solution {
+    border-left: 4px solid #00CED1;
+    background: rgba(0, 206, 209, 0.1);
+}
+
+.image-analysis {
+    border-left: 4px solid #FF1493;
+    background: rgba(255, 20, 147, 0.1);
+}
+</style>
+
+<div class="system-status">
+    <span class="status-indicator status-online"></span>
+    ShamanAI: <span id="systemStatus">Все системы активны</span>
+</div>
